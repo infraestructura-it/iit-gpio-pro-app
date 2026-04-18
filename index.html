@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#03050a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GPIO PRO">
+<link rel="manifest" href="manifest.json">
+<title>IIT GPIO PRO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#03050a;--bg2:#070d18;--bg3:#0b1628;
+  --a:#00d4ff;--a2:#0066ff;--on:#00ff88;--err:#ff3355;--warn:#ffd166;
+  --txt:#c8ddf0;--txt2:rgba(200,221,240,.5);--txt3:rgba(200,221,240,.25);
+  --brd:rgba(0,212,255,.15);--brd2:rgba(0,212,255,.08);
+  --card:linear-gradient(145deg,#070d18,#0b1628);
+  --sh:0 8px 32px rgba(0,0,0,.6);
+  --r:12px;--r2:8px;
+  --nav-h:60px;--header-h:56px;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--txt);font-family:'Rajdhani',sans-serif}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(0,212,255,.012) 40px),
+             repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(0,212,255,.012) 40px)}
+
+/* ── LAYOUT ── */
+#app{display:flex;flex-direction:column;height:100%;position:relative;z-index:1}
+#header{height:var(--header-h);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+  padding:0 16px;border-bottom:1px solid var(--brd2);
+  background:linear-gradient(180deg,rgba(7,13,24,.98),rgba(7,13,24,.92));
+  backdrop-filter:blur(12px);position:relative;z-index:10}
+#pages{flex:1;overflow:hidden;position:relative}
+.page{position:absolute;inset:0;overflow-y:auto;padding:12px 12px 80px;display:none;
+  scrollbar-width:thin;scrollbar-color:var(--brd) transparent}
+.page.active{display:block}
+#navbar{height:var(--nav-h);flex-shrink:0;display:flex;align-items:stretch;
+  border-top:1px solid var(--brd2);
+  background:linear-gradient(0deg,rgba(7,13,24,.98),rgba(7,13,24,.92));
+  backdrop-filter:blur(12px)}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;background:none;border:none;color:var(--txt3);font-family:'Rajdhani',sans-serif;
+  font-size:.58rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  cursor:pointer;transition:color .2s;position:relative;padding:0}
+.nav-btn svg{width:22px;height:22px;transition:all .2s}
+.nav-btn.active{color:var(--a)}
+.nav-btn.active svg{filter:drop-shadow(0 0 6px var(--a))}
+.nav-btn.active::after{content:'';position:absolute;top:0;left:20%;right:20%;height:2px;
+  background:linear-gradient(90deg,transparent,var(--a),transparent);border-radius:0 0 2px 2px}
+
+/* ── HEADER ── */
+.logo{display:flex;align-items:center;gap:10px}
+.logo-mark{width:30px;height:30px;border:1.5px solid var(--a);border-radius:6px;
+  display:flex;align-items:center;justify-content:center;position:relative;
+  box-shadow:0 0 12px rgba(0,212,255,.3)}
+.logo-mark::before{content:'';position:absolute;inset:3px;border:1px solid rgba(0,212,255,.3);border-radius:3px}
+.logo-mark svg{width:14px;height:14px;color:var(--a)}
+.logo-text{font-family:'Orbitron',sans-serif;font-weight:900;font-size:.75rem;
+  letter-spacing:.12em;background:linear-gradient(90deg,var(--a),var(--a2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-sub{font-family:'Share Tech Mono',monospace;font-size:.42rem;color:var(--txt3);
+  letter-spacing:.2em;margin-top:1px}
+
+/* ── CONEXIÓN STATUS ── */
+#connStatus{display:flex;align-items:center;gap:6px;font-family:'Share Tech Mono',monospace;font-size:.55rem}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:var(--txt3);transition:all .3s}
+.conn-dot.local{background:var(--on);box-shadow:0 0 8px var(--on)}
+.conn-dot.relay{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+.conn-dot.off{background:var(--err)}
+#connLabel{color:var(--txt2);font-size:.5rem;letter-spacing:.1em}
+
+/* ── CARDS ── */
+.card{background:var(--card);border:1px solid var(--brd2);border-radius:var(--r);
+  padding:14px;margin-bottom:10px;box-shadow:var(--sh);position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--a),var(--a2));opacity:.6}
+.card-title{font-family:'Orbitron',sans-serif;font-size:.6rem;letter-spacing:.14em;
+  color:var(--a);text-transform:uppercase;margin-bottom:12px}
+
+/* ── LOGIN ── */
+#loginPage{display:flex;align-items:center;justify-content:center;padding:20px}
+#loginPage.active{display:flex}
+.login-card{width:100%;max-width:340px;background:var(--card);border:1px solid var(--brd);
+  border-radius:var(--r);padding:28px 22px;box-shadow:0 20px 60px rgba(0,0,0,.7)}
+.login-logo{text-align:center;margin-bottom:28px}
+.login-logo h1{font-family:'Orbitron',sans-serif;font-weight:900;font-size:1.1rem;
+  letter-spacing:.15em;background:linear-gradient(90deg,var(--a),var(--a2));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.login-logo p{font-family:'Share Tech Mono',monospace;font-size:.48rem;
+  color:var(--txt3);letter-spacing:.2em;margin-top:4px}
+.fld{margin-bottom:14px}
+.fld label{display:block;font-family:'Share Tech Mono',monospace;font-size:.48rem;
+  letter-spacing:.14em;color:var(--txt3);text-transform:uppercase;margin-bottom:5px}
+.inp{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--brd);border-radius:var(--r2);
+  padding:10px 12px;color:var(--txt);font-family:'Rajdhani',sans-serif;font-size:.9rem;
+  outline:none;transition:border-color .2s}
+.inp:focus{border-color:var(--a);box-shadow:0 0 0 2px rgba(0,212,255,.1)}
+.inp-row{position:relative}
+.inp-row .inp{padding-right:40px}
+.eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  background:none;border:none;color:var(--txt3);cursor:pointer;font-size:1rem;padding:4px}
+.btn{display:flex;align-items:center;justify-content:center;gap:6px;
+  width:100%;padding:11px;border:none;border-radius:var(--r2);cursor:pointer;
+  font-family:'Orbitron',sans-serif;font-size:.6rem;font-weight:700;letter-spacing:.1em;
+  transition:all .2s;position:relative;overflow:hidden}
+.btn-primary{background:linear-gradient(135deg,var(--a),var(--a2));color:#03050a}
+.btn-primary:active{transform:scale(.97)}
+.btn-secondary{background:rgba(0,212,255,.08);border:1px solid var(--brd);color:var(--a)}
+.btn-danger{background:rgba(255,51,85,.08);border:1px solid rgba(255,51,85,.3);color:var(--err)}
+.btn-sm{padding:7px 12px;font-size:.52rem;width:auto}
+.ip-row{display:flex;gap:8px;margin-bottom:14px}
+.ip-row .inp{flex:1}
+.msg-box{padding:10px 12px;border-radius:var(--r2);font-size:.8rem;margin-top:10px;display:none}
+.msg-ok{background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.25);color:var(--on)}
+.msg-err{background:rgba(255,51,85,.06);border:1px solid rgba(255,51,85,.25);color:var(--err)}
+
+/* ── GPIO GRID ── */
+.pin-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pin-card{background:var(--card);border:1px solid var(--brd2);border-radius:var(--r);
+  padding:12px;position:relative;overflow:hidden;transition:border-color .2s}
+.pin-card.active-out{border-color:rgba(0,255,136,.4);box-shadow:0 0 12px rgba(0,255,136,.1)}
+.pin-card.active-pwm{border-color:rgba(0,212,255,.4);box-shadow:0 0 12px rgba(0,212,255,.1)}
+.pin-num{font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--txt3);
+  letter-spacing:.1em;margin-bottom:2px}
+.pin-name{font-size:.82rem;font-weight:700;color:var(--txt);margin-bottom:8px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pin-modes{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+.mode-btn{padding:3px 7px;border-radius:4px;border:1px solid var(--brd2);background:none;
+  color:var(--txt3);font-family:'Share Tech Mono',monospace;font-size:.48rem;
+  cursor:pointer;transition:all .15s;letter-spacing:.06em}
+.mode-btn.active-mode{border-color:var(--a);color:var(--a);background:rgba(0,212,255,.08)}
+.pin-control{margin-top:6px}
+/* Toggle */
+.toggle{width:44px;height:24px;background:rgba(255,255,255,.08);border-radius:12px;
+  position:relative;cursor:pointer;transition:background .2s;border:1px solid var(--brd);flex-shrink:0}
+.toggle.on{background:rgba(0,255,136,.25);border-color:rgba(0,255,136,.5)}
+.toggle::after{content:'';position:absolute;width:18px;height:18px;border-radius:50%;
+  background:var(--txt3);top:2px;left:2px;transition:all .2s}
+.toggle.on::after{left:22px;background:var(--on);box-shadow:0 0 6px var(--on)}
+.pin-value{font-family:'Share Tech Mono',monospace;font-size:.72rem;color:var(--txt2);
+  display:flex;align-items:center;gap:8px}
+/* PWM slider */
+.pwm-wrap{width:100%}
+.pwm-slider{-webkit-appearance:none;appearance:none;width:100%;height:4px;
+  border-radius:2px;background:rgba(255,255,255,.1);outline:none;cursor:pointer}
+.pwm-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;
+  border-radius:50%;background:var(--a);cursor:pointer;box-shadow:0 0 6px var(--a)}
+.pwm-val{font-family:'Share Tech Mono',monospace;font-size:.55rem;color:var(--a);
+  text-align:right;margin-top:3px}
+/* ADC / INPUT */
+.adc-val{font-family:'Share Tech Mono',monospace;font-size:1rem;color:var(--a);
+  letter-spacing:.05em}
+.adc-sub{font-size:.5rem;color:var(--txt3);margin-top:2px}
+.read-btn{padding:4px 8px;background:rgba(0,212,255,.08);border:1px solid var(--brd);
+  border-radius:4px;color:var(--a);font-family:'Share Tech Mono',monospace;
+  font-size:.48rem;cursor:pointer;transition:all .15s}
+.read-btn:active{background:rgba(0,212,255,.2)}
+
+/* ── BADGE / PILL ── */
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:20px;
+  font-family:'Share Tech Mono',monospace;font-size:.48rem;letter-spacing:.08em}
+.pill-on{background:rgba(0,255,136,.1);border:1px solid rgba(0,255,136,.3);color:var(--on)}
+.pill-off{background:rgba(255,255,255,.04);border:1px solid var(--brd2);color:var(--txt3)}
+.pill-warn{background:rgba(255,209,102,.1);border:1px solid rgba(255,209,102,.3);color:var(--warn)}
+.pill .dot{width:5px;height:5px;border-radius:50%;background:currentColor}
+
+/* ── SCHEDULER ── */
+.sched-item{background:rgba(0,0,0,.3);border:1px solid var(--brd2);border-radius:var(--r2);
+  padding:10px 12px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.sched-time{font-family:'Orbitron',sans-serif;font-size:.75rem;color:var(--a);min-width:48px}
+.sched-info{flex:1}
+.sched-pin{font-size:.82rem;font-weight:700}
+.sched-days{font-family:'Share Tech Mono',monospace;font-size:.48rem;color:var(--txt3);margin-top:2px}
+.sched-del{padding:5px 8px;background:rgba(255,51,85,.08);border:1px solid rgba(255,51,85,.2);
+  border-radius:4px;color:var(--err);font-family:'Share Tech Mono',monospace;
+  font-size:.48rem;cursor:pointer}
+
+/* ── HISTORIAL ── */
+.hist-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;
+  border-bottom:1px solid var(--brd2)}
+.hist-item:last-child{border-bottom:none}
+.hist-time{font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--txt3);
+  min-width:50px;padding-top:2px}
+.hist-pin{font-family:'Share Tech Mono',monospace;font-size:.58rem;color:var(--a);min-width:30px}
+.hist-mode{padding:2px 6px;border-radius:3px;font-family:'Share Tech Mono',monospace;
+  font-size:.45rem;text-transform:uppercase}
+.hist-out{background:rgba(0,255,136,.1);color:var(--on)}
+.hist-pwm{background:rgba(0,212,255,.1);color:var(--a)}
+.hist-in{background:rgba(255,209,102,.1);color:var(--warn)}
+.hist-val{font-size:.78rem;font-weight:600;margin-left:auto}
+.hist-user{font-family:'Share Tech Mono',monospace;font-size:.45rem;color:var(--txt3)}
+
+/* ── ADMIN ── */
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.info-cell{background:rgba(0,0,0,.3);border-radius:var(--r2);padding:10px;border:1px solid var(--brd2)}
+.info-key{font-family:'Share Tech Mono',monospace;font-size:.45rem;color:var(--txt3);
+  letter-spacing:.1em;text-transform:uppercase;margin-bottom:3px}
+.info-val{font-size:.85rem;font-weight:700;color:var(--txt)}
+.user-item{display:flex;align-items:center;gap:10px;padding:8px 0;
+  border-bottom:1px solid var(--brd2)}
+.user-item:last-child{border-bottom:none}
+.user-name{flex:1;font-weight:600}
+.user-role{font-family:'Share Tech Mono',monospace;font-size:.5rem;
+  padding:2px 6px;border-radius:3px;background:rgba(0,212,255,.1);color:var(--a)}
+.user-role.admin{background:rgba(255,209,102,.1);color:var(--warn)}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:100;
+  display:flex;align-items:flex-end;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .25s}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal-sheet{background:linear-gradient(180deg,#0d1b2e,#070d18);border-radius:20px 20px 0 0;
+  border:1px solid var(--brd);border-bottom:none;padding:20px 16px 32px;
+  width:100%;max-width:480px;transform:translateY(100%);transition:transform .3s cubic-bezier(.4,0,.2,1)}
+.modal-overlay.open .modal-sheet{transform:translateY(0)}
+.modal-handle{width:36px;height:4px;background:var(--brd);border-radius:2px;margin:0 auto 16px}
+.modal-title{font-family:'Orbitron',sans-serif;font-size:.65rem;letter-spacing:.14em;
+  color:var(--a);text-transform:uppercase;margin-bottom:16px}
+.modal-close{position:absolute;right:16px;top:16px;background:none;border:none;
+  color:var(--txt3);font-size:1.2rem;cursor:pointer;padding:4px}
+
+/* ── SECTION TITLE ── */
+.section-title{font-family:'Share Tech Mono',monospace;font-size:.48rem;letter-spacing:.18em;
+  color:var(--txt3);text-transform:uppercase;margin:16px 0 8px;padding-left:2px}
+
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:32px 16px;color:var(--txt3)}
+.empty svg{width:40px;height:40px;margin:0 auto 10px;opacity:.3;display:block}
+.empty p{font-size:.8rem}
+
+/* ── SPINNER ── */
+.spin{width:20px;height:20px;border:2px solid var(--brd);border-top-color:var(--a);
+  border-radius:50%;animation:rot .7s linear infinite;display:inline-block}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* ── FAB ── */
+.fab{position:fixed;bottom:74px;right:16px;width:48px;height:48px;border-radius:50%;
+  background:linear-gradient(135deg,var(--a),var(--a2));border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 16px rgba(0,212,255,.4);z-index:20;transition:transform .2s}
+.fab:active{transform:scale(.92)}
+.fab svg{width:22px;height:22px;color:#03050a}
+
+/* ── ALL OFF ── */
+#allOffBtn{position:fixed;bottom:74px;left:16px;z-index:20}
+
+/* ── SELECT ── */
+select.inp{background:rgba(0,0,0,.4) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%2300d4ff'/%3E%3C/svg%3E") no-repeat right 10px center;
+  -webkit-appearance:none;appearance:none;padding-right:28px}
+
+/* ── TOAST ── */
+#toast{position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-10px);
+  background:rgba(7,13,24,.95);border:1px solid var(--brd);border-radius:8px;
+  padding:8px 16px;font-size:.78rem;color:var(--txt);white-space:nowrap;
+  z-index:200;opacity:0;transition:all .3s;pointer-events:none;backdrop-filter:blur(8px)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.ok{border-color:rgba(0,255,136,.4);color:var(--on)}
+#toast.err{border-color:rgba(255,51,85,.4);color:var(--err)}
+
+/* ── SWITCH ── */
+.sw-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0}
+.sw-label{font-size:.85rem;color:var(--txt)}
+.sw{width:40px;height:22px;background:rgba(255,255,255,.08);border-radius:11px;
+  position:relative;cursor:pointer;transition:background .2s;border:1px solid var(--brd);flex-shrink:0}
+.sw.on{background:rgba(0,212,255,.3);border-color:var(--a)}
+.sw::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;
+  background:var(--txt3);top:2px;left:2px;transition:all .2s}
+.sw.on::after{left:20px;background:var(--a)}
+</style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<!-- ══ LOGIN PAGE ══ -->
+<div id="loginPage" class="page active">
+  <div class="login-card">
+    <div class="login-logo">
+      <h1>IIT GPIO PRO</h1>
+      <p>INFRAESTRUCTURA-IT · ESP32-S3</p>
+    </div>
+
+    <div class="section-title">Dirección del dispositivo</div>
+    <div class="ip-row">
+      <input class="inp" id="deviceIP" type="text" placeholder="192.168.1.x" value="">
+      <input class="inp" id="devicePort" type="number" placeholder="80" value="80" style="width:70px;flex:none">
+    </div>
+
+    <div class="fld">
+      <label>Usuario</label>
+      <input class="inp" id="loginUser" type="text" placeholder="admin" autocomplete="username">
+    </div>
+    <div class="fld">
+      <label>Contraseña</label>
+      <div class="inp-row">
+        <input class="inp" id="loginPass" type="password" placeholder="••••••" autocomplete="current-password">
+        <button class="eye" onclick="toggleEye('loginPass',this)">👁</button>
+      </div>
+    </div>
+
+    <div id="loginMsg" class="msg-box"></div>
+
+    <button class="btn btn-primary" onclick="doLogin()" style="margin-top:4px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+      CONECTAR
+    </button>
+  </div>
+</div>
+
+<!-- ══ APP SHELL ══ -->
+<div id="app" style="display:none">
+  <!-- Header -->
+  <div id="header">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      </div>
+      <div>
+        <div class="logo-text">GPIO PRO</div>
+        <div class="logo-sub">IIT · ESP32-S3</div>
+      </div>
+    </div>
+    <div id="connStatus">
+      <div class="conn-dot off" id="connDot"></div>
+      <div id="connLabel">OFFLINE</div>
+    </div>
+  </div>
+
+  <!-- Pages -->
+  <div id="pages">
+
+    <!-- ── GPIO PAGE ── -->
+    <div id="pageGpio" class="page active">
+      <div class="pin-grid" id="pinGrid"></div>
+    </div>
+
+    <!-- ── SCHEDULER PAGE ── -->
+    <div id="pageSched" class="page">
+      <div id="schedList"></div>
+    </div>
+
+    <!-- ── HISTORIAL PAGE ── -->
+    <div id="pageHist" class="page">
+      <div class="card">
+        <div id="histList"></div>
+      </div>
+    </div>
+
+    <!-- ── ADMIN PAGE ── -->
+    <div id="pageAdmin" class="page">
+      <!-- Info sistema -->
+      <div class="card">
+        <div class="card-title">Sistema</div>
+        <div class="info-grid">
+          <div class="info-cell"><div class="info-key">IP</div><div class="info-val" id="infoIP">---</div></div>
+          <div class="info-cell"><div class="info-key">Uptime</div><div class="info-val" id="infoUp">---</div></div>
+          <div class="info-cell"><div class="info-key">NTP</div><div class="info-val" id="infoNTP">---</div></div>
+          <div class="info-cell"><div class="info-key">WS</div><div class="info-val" id="infoWS">---</div></div>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-danger btn-sm" onclick="confirmAllOff()">⚡ TODO OFF</button>
+          <button class="btn btn-secondary btn-sm" onclick="doLogout()">SALIR</button>
+        </div>
+      </div>
+
+      <!-- Usuarios -->
+      <div class="card" id="usersCard" style="display:none">
+        <div class="card-title">Usuarios</div>
+        <div id="usersList"></div>
+        <button class="btn btn-secondary btn-sm" onclick="openUserModal()" style="margin-top:10px;width:auto">+ USUARIO</button>
+      </div>
+
+      <!-- OTA -->
+      <div class="card" id="otaCard" style="display:none">
+        <div class="card-title">OTA — Actualizar firmware</div>
+        <input type="file" id="otaFile" accept=".bin" style="display:none" onchange="otaSelected(this)">
+        <div style="margin-bottom:10px;font-size:.82rem;color:var(--txt2)">Sube el .bin generado con <em>Sketch → Export Compiled Binary</em></div>
+        <div class="btn-row">
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('otaFile').click()">SELECCIONAR .BIN</button>
+          <button class="btn btn-primary btn-sm" id="otaUpBtn" onclick="otaUpload()" disabled style="opacity:.4">SUBIR</button>
+        </div>
+        <div id="otaName" style="font-size:.7rem;color:var(--txt3);margin-top:6px"></div>
+        <div id="otaBar" style="display:none;margin-top:10px">
+          <div style="background:rgba(255,255,255,.06);border-radius:4px;height:6px">
+            <div id="otaFill" style="height:100%;width:0%;background:linear-gradient(90deg,var(--a),var(--a2));border-radius:4px;transition:width .3s"></div>
+          </div>
+          <div id="otaPct" style="font-family:'Share Tech Mono',monospace;font-size:.5rem;color:var(--a);margin-top:4px;text-align:right">0%</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Navbar -->
+  <nav id="navbar">
+    <button class="nav-btn active" id="nb-gpio" onclick="showPage('gpio')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M7 7V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><circle cx="12" cy="11" r="1"/></svg>
+      GPIOs
+    </button>
+    <button class="nav-btn" id="nb-sched" onclick="showPage('sched')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>
+      Sched
+    </button>
+    <button class="nav-btn" id="nb-hist" onclick="showPage('hist')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><line x1="12" y1="7" x2="12" y2="12"/><line x1="12" y1="12" x2="16" y2="14"/></svg>
+      Historial
+    </button>
+    <button class="nav-btn" id="nb-admin" onclick="showPage('admin')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      Admin
+    </button>
+  </nav>
+</div>
+
+<!-- ══ MODAL SCHEDULER ══ -->
+<div class="modal-overlay" id="schedModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('schedModal')">✕</button>
+    <div class="modal-title" id="schedModalT">Nuevo evento</div>
+    <input type="hidden" id="sId">
+    <div class="fld">
+      <label>GPIO</label>
+      <select class="inp" id="sPin"></select>
+    </div>
+    <div class="fld">
+      <label>Acción</label>
+      <select class="inp" id="sAct" onchange="schedActChange()">
+        <option value="on">ON — HIGH</option>
+        <option value="off">OFF — LOW</option>
+        <option value="pwm">PWM</option>
+        <option value="toggle">Toggle</option>
+      </select>
+    </div>
+    <div class="fld" id="sPwmFld" style="display:none">
+      <label>Valor PWM (0-255)</label>
+      <input class="inp" id="sPwmV" type="number" min="0" max="255" value="128">
+    </div>
+    <div class="fld">
+      <label>Hora</label>
+      <input class="inp" id="sTime" type="time" value="08:00">
+    </div>
+    <div class="fld">
+      <label>Días</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <label style="display:flex;align-items:center;gap:4px;font-size:.8rem"><input type="checkbox" id="dL" value="1"> L</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:.8rem"><input type="checkbox" id="dM" value="2"> M</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:.8rem"><input type="checkbox" id="dX" value="3"> X</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:.8rem"><input type="checkbox" id="dJ" value="4"> J</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:.8rem"><input type="checkbox" id="dV" value="5"> V</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:.8rem"><input type="checkbox" id="dS" value="6"> S</label>
+        <label style="display:flex;align-items:center;gap:4px;font-size:.8rem"><input type="checkbox" id="dD" value="0"> D</label>
+      </div>
+    </div>
+    <div class="fld">
+      <label>Estado</label>
+      <select class="inp" id="sEn"><option value="1">Activo</option><option value="0">Inactivo</option></select>
+    </div>
+    <div class="btn-row" style="margin-top:14px">
+      <button class="btn btn-primary" style="flex:1" onclick="saveSched()">GUARDAR</button>
+      <button class="btn btn-danger btn-sm" id="sDelBtn" style="display:none" onclick="delSched()">ELIMINAR</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL USUARIO ══ -->
+<div class="modal-overlay" id="userModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('userModal')">✕</button>
+    <div class="modal-title">Nuevo usuario</div>
+    <div class="fld"><label>Usuario</label><input class="inp" id="nusr" type="text"></div>
+    <div class="fld">
+      <label>Contraseña</label>
+      <div class="inp-row">
+        <input class="inp" id="npwd" type="password">
+        <button class="eye" onclick="toggleEye('npwd',this)">👁</button>
+      </div>
+    </div>
+    <div class="fld">
+      <label>Rol</label>
+      <select class="inp" id="nrol">
+        <option value="admin">Admin</option>
+        <option value="viewer">Viewer</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="saveUser()" style="margin-top:4px">CREAR</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════
+var S = {
+  ip: '', port: 80, token: '', role: '',
+  ws: null, wsRetry: null, wsConnected: false,
+  pins: [], sched: [], hist: [], users: [],
+  isAdmin: false, otaFile: null,
+  pingInterval: null
+};
+
+var BASE = () => 'http://' + S.ip + (S.port!=80?':'+S.port:'');
+var WS_URL = () => 'ws://' + S.ip + ':81';
+
+// ── Helpers ──────────────────────────────────────────
+function G(id){ return document.getElementById(id) }
+
+function toast(msg, type, dur){
+  var t = G('toast');
+  t.textContent = msg;
+  t.className = 'show ' + (type||'');
+  clearTimeout(t._t);
+  t._t = setTimeout(function(){ t.className = ''; }, dur||2500);
+}
+
+function toggleEye(id, btn){
+  var el = G(id);
+  el.type = el.type==='password' ? 'text' : 'password';
+  btn.textContent = el.type==='password' ? '👁' : '🙈';
+}
+
+function showPage(name){
+  document.querySelectorAll('.page').forEach(function(p){ p.classList.remove('active') });
+  document.querySelectorAll('.nav-btn').forEach(function(b){ b.classList.remove('active') });
+  var page = G('page' + name.charAt(0).toUpperCase() + name.slice(1));
+  var btn  = G('nb-' + name);
+  if(page) page.classList.add('active');
+  if(btn)  btn.classList.add('active');
+  if(name==='hist')  loadHist();
+  if(name==='sched') loadSched();
+  if(name==='admin') loadInfo();
+}
+
+function openModal(id){ G(id).classList.add('open') }
+function closeModal(id){ G(id).classList.remove('open') }
+
+// ── Auth ─────────────────────────────────────────────
+function doLogin(){
+  S.ip   = G('deviceIP').value.trim();
+  S.port = parseInt(G('devicePort').value)||80;
+  var user = G('loginUser').value.trim();
+  var pass = G('loginPass').value;
+  if(!S.ip){ showLoginMsg('Ingresa la IP del dispositivo','err'); return; }
+  if(!user || !pass){ showLoginMsg('Ingresa usuario y contraseña','err'); return; }
+  showLoginMsg('Conectando...','');
+  fetch(BASE()+'/api/login', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({user:user, pass:pass})
+  })
+  .then(function(r){ return r.json() })
+  .then(function(d){
+    if(!d.token){ showLoginMsg(d.error||'Credenciales incorrectas','err'); return; }
+    S.token = d.token;
+    S.role  = d.role||'viewer';
+    S.isAdmin = (S.role==='admin');
+    localStorage.setItem('iit_ip',   S.ip);
+    localStorage.setItem('iit_port', S.port);
+    localStorage.setItem('iit_token',S.token);
+    localStorage.setItem('iit_role', S.role);
+    launchApp();
+  })
+  .catch(function(e){ showLoginMsg('No se pudo conectar al dispositivo','err') });
+}
+
+function showLoginMsg(msg, type){
+  var el = G('loginMsg');
+  el.className = 'msg-box ' + (type==='err'?'msg-err':'msg-ok');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+function doLogout(){
+  apiPost('/api/logout',{}).catch(function(){});
+  S.token=''; S.role=''; S.isAdmin=false;
+  if(S.ws) S.ws.close();
+  clearInterval(S.pingInterval);
+  localStorage.removeItem('iit_token');
+  G('app').style.display='none';
+  G('loginPage').classList.add('active');
+  G('loginPage').style.display='flex';
+}
+
+// ── API helpers ───────────────────────────────────────
+function apiReq(method, path, body){
+  var opts = { method:method, headers:{'X-Token':S.token} };
+  if(body !== undefined){
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  return fetch(BASE()+path, opts).then(function(r){ return r.json() });
+}
+var apiGet  = function(p){ return apiReq('GET',p) };
+var apiPost = function(p,b){ return apiReq('POST',p,b) };
+var apiPut  = function(p,b){ return apiReq('PUT',p,b) };
+var apiDel  = function(p){ return apiReq('DELETE',p) };
+
+// ── WebSocket ─────────────────────────────────────────
+function wsConnect(){
+  if(S.ws && (S.ws.readyState===0||S.ws.readyState===1)) return;
+  S.ws = new WebSocket(WS_URL());
+  S.ws.onopen = function(){
+    S.wsConnected = true;
+    setConnStatus('local');
+    S.ws.send(JSON.stringify({cmd:'GET_STATE'}));
+    S.pingInterval = setInterval(function(){
+      if(S.ws && S.ws.readyState===1) S.ws.send(JSON.stringify({cmd:'PING'}));
+    }, 20000);
+  };
+  S.ws.onmessage = function(e){
+    try{
+      var d = JSON.parse(e.data);
+      if(d.type==='STATE' && d.pins){ S.pins=d.pins; renderPins(); }
+      else if(d.type==='PIN_CHANGE'){ updatePin(d); }
+      else if(d.type==='SCHED_FIRED'){ toast('Scheduler: GPIO'+d.pin+' → '+d.action,'ok'); }
+    }catch(ex){}
+  };
+  S.ws.onerror = function(){};
+  S.ws.onclose = function(){
+    S.wsConnected = false;
+    setConnStatus('off');
+    clearInterval(S.pingInterval);
+    S.wsRetry = setTimeout(wsConnect, 4000);
+  };
+}
+
+function setConnStatus(state){
+  var dot   = G('connDot');
+  var label = G('connLabel');
+  dot.className = 'conn-dot ' + state;
+  label.textContent = state==='local'?'LOCAL':state==='relay'?'RELAY':'OFFLINE';
+  G('infoWS').textContent = (S.ws ? S.ws.readyState===1?'Conectado':'Cerrado' : '---');
+}
+
+// ── Launch App ────────────────────────────────────────
+function launchApp(){
+  G('loginPage').classList.remove('active');
+  G('loginPage').style.display='none';
+  G('app').style.display='flex';
+  if(S.isAdmin){
+    G('usersCard').style.display='block';
+    G('otaCard').style.display='block';
+  }
+  wsConnect();
+  loadInfo();
+  loadUsers();
+}
+
+// ── PINS ─────────────────────────────────────────────
+function renderPins(){
+  var g = G('pinGrid');
+  if(!S.pins.length){ g.innerHTML='<div class="empty" style="grid-column:span 2"><p>Sin pines</p></div>'; return; }
+  g.innerHTML = S.pins.map(function(p){ return buildPinCard(p); }).join('');
+}
+
+function buildPinCard(p){
+  var idx = p.pin;
+  var modes = ['none','output','input','pwm','adc'];
+  var modeBtns = modes.map(function(m){
+    return '<button class="mode-btn'+(p.mode===m?' active-mode':'')+'" onclick="setMode('+idx+',\''+m+'\')">'+(m==='none'?'--':m.toUpperCase())+'</button>';
+  }).join('');
+
+  var ctrl = '';
+  if(p.mode==='output'){
+    ctrl = '<div class="pin-value"><div class="toggle'+(p.value?' on':'')+'" onclick="toggleOut('+idx+')"></div><span>'+(p.value?'HIGH':'LOW')+'</span></div>';
+  } else if(p.mode==='pwm'){
+    ctrl = '<div class="pwm-wrap"><input type="range" class="pwm-slider" min="0" max="255" value="'+p.value+'" oninput="pwmInput('+idx+',this.value)" onchange="setPWM('+idx+',this.value)"><div class="pwm-val">'+p.value+' / 255</div></div>';
+  } else if(p.mode==='input'){
+    ctrl = '<div class="pin-value"><button class="read-btn" onclick="readDigital('+idx+')">LEER</button><span id="dv'+idx+'">'+p.value+'</span></div>';
+  } else if(p.mode==='adc'){
+    ctrl = '<div><div class="adc-val" id="av'+idx+'">'+(p.value||'---')+'</div><div class="adc-sub">raw / 4095</div><button class="read-btn" style="margin-top:4px" onclick="readADC('+idx+')">LEER</button></div>';
+  }
+
+  var cls = 'pin-card'+(p.mode==='output'&&p.value?' active-out':p.mode==='pwm'&&p.value>0?' active-pwm':'');
+  return '<div class="'+cls+'" id="pc'+idx+'"><div class="pin-num">GPIO '+idx+'</div><div class="pin-name">'+escH(p.name)+'</div><div class="pin-modes">'+modeBtns+'</div><div class="pin-control">'+ctrl+'</div></div>';
+}
+
+function updatePin(d){
+  var idx = S.pins.findIndex(function(p){ return p.pin===d.pin });
+  if(idx<0) return;
+  S.pins[idx] = Object.assign(S.pins[idx], d);
+  var el = G('pc'+d.pin);
+  if(el){ el.outerHTML = buildPinCard(S.pins[idx]); }
+}
+
+function setMode(pin, mode){
+  if(!S.isAdmin){ toast('Solo admin puede cambiar modos','err'); return; }
+  apiPost('/api/pin/'+pin+'/mode', {mode:mode})
+    .then(function(d){ if(d.ok) toast('GPIO'+pin+' → '+mode,'ok') })
+    .catch(function(){ toast('Error al cambiar modo','err') });
+}
+
+function toggleOut(pin){
+  if(!S.isAdmin){ toast('Solo admin','err'); return; }
+  var p = S.pins.find(function(x){ return x.pin===pin });
+  if(!p) return;
+  var ns = p.value ? 0 : 1;
+  apiPost('/api/pin/'+pin+'/digital', {state:ns})
+    .catch(function(){ toast('Error','err') });
+}
+
+function pwmInput(pin, val){
+  var el = G('pc'+pin);
+  if(el){ var pv=el.querySelector('.pwm-val'); if(pv) pv.textContent=val+' / 255'; }
+}
+
+function setPWM(pin, val){
+  if(!S.isAdmin){ toast('Solo admin','err'); return; }
+  apiPost('/api/pin/'+pin+'/pwm', {duty:parseInt(val)})
+    .catch(function(){ toast('Error PWM','err') });
+}
+
+function readDigital(pin){
+  apiGet('/api/pin/'+pin+'/digital').then(function(d){
+    var el=G('dv'+pin); if(el) el.textContent=d.state;
+  });
+}
+
+function readADC(pin){
+  apiGet('/api/pin/'+pin+'/adc/avg').then(function(d){
+    var el=G('av'+pin); if(el) el.textContent=d.raw;
+  });
+}
+
+function confirmAllOff(){
+  if(!confirm('¿Apagar todos los outputs?')) return;
+  apiPost('/api/all/off',{}).then(function(){ toast('Todos apagados','ok') });
+}
+
+// ── SCHEDULER ─────────────────────────────────────────
+function loadSched(){
+  apiGet('/api/schedule').then(function(d){
+    S.sched = d.events||[];
+    renderSched();
+  });
+}
+
+function renderSched(){
+  var el = G('schedList');
+  if(!S.sched.length){
+    el.innerHTML='<div class="empty"><p>Sin eventos programados</p></div>'; return;
+  }
+  var days=['D','L','M','X','J','V','S'];
+  el.innerHTML = S.sched.map(function(e){
+    var dayStr='';
+    for(var i=0;i<7;i++) if(e.days&(1<<i)) dayStr+=days[i]+' ';
+    return '<div class="sched-item">'
+      +'<div class="sched-time">'+pad(e.hour)+':'+pad(e.min)+'</div>'
+      +'<div class="sched-info">'
+        +'<div class="sched-pin">GPIO '+e.pin+' → '+e.action.toUpperCase()+(e.action==='pwm'?' ('+e.pwm_val+')':'')+'</div>'
+        +'<div class="sched-days">'+dayStr.trim()+'</div>'
+      +'</div>'
+      +'<div class="'+'pill '+(e.enabled?'pill-on':'pill-off')+'" style="margin-right:8px"><span class="dot"></span>'+(e.enabled?'ON':'OFF')+'</div>'
+      +(S.isAdmin?'<button class="sched-del" onclick="openEditSched('+JSON.stringify(e).split('"').join("'")+')">✎</button>':'')
+    +'</div>';
+  }).join('');
+}
+
+function openNewSched(){
+  G('schedModalT').textContent='Nuevo evento';
+  G('sId').value='';
+  G('sDelBtn').style.display='none';
+  G('sPin').innerHTML = S.pins.filter(function(p){ return p.mode==='output'||p.mode==='pwm'||p.mode==='none'}).map(function(p){
+    return '<option value="'+p.pin+'">GPIO '+p.pin+' — '+escH(p.name)+'</option>';
+  }).join('');
+  G('sAct').value='on'; schedActChange();
+  G('sTime').value='08:00';
+  ['dL','dM','dX','dJ','dV','dS','dD'].forEach(function(d){ G(d).checked=false });
+  openModal('schedModal');
+}
+
+function openEditSched(e){
+  G('schedModalT').textContent='Editar evento';
+  G('sId').value=e.id;
+  G('sDelBtn').style.display='inline-flex';
+  G('sPin').innerHTML='<option value="'+e.pin+'">GPIO '+e.pin+'</option>';
+  G('sAct').value=e.action; schedActChange();
+  if(e.action==='pwm') G('sPwmV').value=e.pwm_val;
+  G('sTime').value=pad(e.hour)+':'+pad(e.min);
+  var days=['dD','dL','dM','dX','dJ','dV','dS'];
+  for(var i=0;i<7;i++) G(days[i]).checked=!!(e.days&(1<<i));
+  G('sEn').value=e.enabled?'1':'0';
+  openModal('schedModal');
+}
+
+function schedActChange(){ G('sPwmFld').style.display=G('sAct').value==='pwm'?'block':'none' }
+
+function saveSched(){
+  var days=0;
+  [['dL',1],['dM',2],['dX',3],['dJ',4],['dV',5],['dS',6],['dD',0]].forEach(function(x){
+    if(G(x[0]).checked) days|=(1<<x[1]);
+  });
+  var t=G('sTime').value.split(':');
+  var body={pin:parseInt(G('sPin').value),action:G('sAct').value,
+    hour:parseInt(t[0]),min:parseInt(t[1]),days:days,
+    pwm_val:parseInt(G('sPwmV').value)||0,enabled:G('sEn').value==='1'};
+  var id=G('sId').value;
+  var req=id?apiPut('/api/schedule/'+id,body):apiPost('/api/schedule',body);
+  req.then(function(d){ if(d.ok||d.id){ closeModal('schedModal'); loadSched(); toast('Guardado','ok') }
+    else toast(d.error||'Error','err') });
+}
+
+function delSched(){
+  var id=G('sId').value; if(!id) return;
+  apiDel('/api/schedule/'+id).then(function(){ closeModal('schedModal'); loadSched(); toast('Eliminado','ok') });
+}
+
+// ── HISTORIAL ─────────────────────────────────────────
+function loadHist(){
+  apiGet('/api/history').then(function(d){
+    S.hist=d.history||[];
+    renderHist();
+  });
+}
+
+function renderHist(){
+  var el=G('histList');
+  if(!S.hist.length){ el.innerHTML='<div class="empty"><p>Sin historial</p></div>'; return; }
+  el.innerHTML=S.hist.slice().reverse().map(function(h){
+    var mc=h.mode==='output'?'hist-out':h.mode==='pwm'?'hist-pwm':'hist-in';
+    return '<div class="hist-item">'
+      +'<div class="hist-time">'+(h.last_change||h.time||'').split(' ').pop()+'</div>'
+      +'<div class="hist-pin">'+h.pin+'</div>'
+      +'<span class="hist-mode '+mc+'">'+h.mode+'</span>'
+      +'<div class="hist-val">'+h.value+'</div>'
+      +'<div class="hist-user">'+escH(h.user||'')+'</div>'
+    +'</div>';
+  }).join('');
+}
+
+// ── INFO ──────────────────────────────────────────────
+function loadInfo(){
+  apiGet('/api/info').then(function(d){
+    if(!d) return;
+    G('infoIP').textContent  = d.ip||S.ip;
+    G('infoNTP').textContent = d.ntp_synced?'Sincronizado':'No sincronizado';
+    G('infoUp').textContent  = fmtUptime(d.uptime_ms||0);
+    G('infoWS').textContent  = S.wsConnected?'Conectado':'Desconectado';
+  });
+}
+
+function fmtUptime(ms){
+  var s=Math.floor(ms/1000),m=Math.floor(s/60),h=Math.floor(m/60);
+  return h>0?(h+'h '+pad(m%60)+'m'):(m>0?m+'m '+pad(s%60)+'s':s+'s');
+}
+
+// ── USUARIOS ──────────────────────────────────────────
+function loadUsers(){
+  if(!S.isAdmin) return;
+  apiGet('/api/users').then(function(d){
+    S.users=d.users||[];
+    renderUsers();
+  });
+}
+
+function renderUsers(){
+  var el=G('usersList');
+  if(!S.users.length){ el.innerHTML='<div class="empty"><p>Sin usuarios</p></div>'; return; }
+  el.innerHTML=S.users.map(function(u){
+    return '<div class="user-item">'
+      +'<div class="user-name">'+escH(u.name)+'</div>'
+      +'<span class="user-role '+(u.role==='admin'?'admin':'')+'">'+(u.role||'viewer')+'</span>'
+      +(S.isAdmin?'<button class="sched-del" onclick="delUser(\''+escH(u.name)+'\')">✕</button>':'')
+    +'</div>';
+  }).join('');
+}
+
+function openUserModal(){ G('nusr').value=''; G('npwd').value=''; G('nrol').value='admin'; openModal('userModal') }
+
+function saveUser(){
+  var name=G('nusr').value.trim(), pass=G('npwd').value, role=G('nrol').value;
+  if(!name||!pass){ toast('Completa todos los campos','err'); return; }
+  apiPost('/api/users',{name,pass,role}).then(function(d){
+    if(d.ok){ closeModal('userModal'); loadUsers(); toast('Usuario creado','ok') }
+    else toast(d.error||'Error','err');
+  });
+}
+
+function delUser(name){
+  if(!confirm('¿Eliminar usuario '+name+'?')) return;
+  apiDel('/api/users/'+name).then(function(){ loadUsers(); toast('Eliminado','ok') });
+}
+
+// ── OTA ───────────────────────────────────────────────
+function otaSelected(inp){
+  if(!inp.files||!inp.files[0]) return;
+  S.otaFile=inp.files[0];
+  G('otaName').textContent=S.otaFile.name+' ('+Math.round(S.otaFile.size/1024)+' KB)';
+  G('otaUpBtn').disabled=false; G('otaUpBtn').style.opacity='1';
+}
+
+function otaUpload(){
+  if(!S.otaFile){ toast('Selecciona un .bin','err'); return; }
+  var xhr=new XMLHttpRequest();
+  G('otaBar').style.display='block';
+  xhr.upload.onprogress=function(e){
+    if(e.lengthComputable){ var p=Math.round(e.loaded/e.total*100);
+      G('otaFill').style.width=p+'%'; G('otaPct').textContent=p+'%'; }
+  };
+  xhr.onload=function(){
+    if(xhr.status===200){ toast('Firmware actualizado — reiniciando...','ok');
+      setTimeout(function(){ G('otaBar').style.display='none'; },6000); }
+    else toast('Error OTA: '+xhr.responseText,'err');
+  };
+  var fd=new FormData();
+  fd.append('firmware',S.otaFile,S.otaFile.name);
+  xhr.open('POST',BASE()+'/update');
+  xhr.setRequestHeader('X-Token',S.token);
+  xhr.send(fd);
+}
+
+// ── UTILS ─────────────────────────────────────────────
+function pad(n){ return String(n).padStart(2,'0') }
+function escH(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+
+// ── INIT ──────────────────────────────────────────────
+window.addEventListener('load', function(){
+  // Restaurar sesión guardada
+  var ip    = localStorage.getItem('iit_ip');
+  var port  = localStorage.getItem('iit_port');
+  var token = localStorage.getItem('iit_token');
+  var role  = localStorage.getItem('iit_role');
+  if(ip) G('deviceIP').value = ip;
+  if(port) G('devicePort').value = port;
+  if(ip && token){
+    S.ip=ip; S.port=parseInt(port)||80; S.token=token; S.role=role||'viewer';
+    S.isAdmin=(S.role==='admin');
+    // Verificar token aún válido
+    apiGet('/api/info').then(function(d){
+      if(d && !d.error){ launchApp(); }
+    }).catch(function(){});
+  }
+});
+
+// Fab scheduler
+document.addEventListener('DOMContentLoaded', function(){
+  var fab = document.createElement('button');
+  fab.className='fab'; fab.id='fabSched'; fab.style.display='none';
+  fab.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+  fab.onclick = function(){ openNewSched() };
+  document.body.appendChild(fab);
+});
+
+// Mostrar FAB solo en scheduler
+var _origShowPage = showPage;
+showPage = function(name){
+  _origShowPage(name);
+  var fab=G('fabSched');
+  if(fab) fab.style.display=(name==='sched'&&S.isAdmin)?'flex':'none';
+};
+
+// Cerrar modals tocando overlay
+document.querySelectorAll('.modal-overlay').forEach(function(el){
+  el.addEventListener('click', function(e){ if(e.target===el) closeModal(el.id) });
+});
+
+// Service Worker
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(function(){});
+}
+</script>
+</body>
+</html>

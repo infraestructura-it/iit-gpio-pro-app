@@ -753,6 +753,15 @@ function wsOnReady(){
   }, 20000);
 }
 
+// Enviar comando via WebSocket activo (local o relay)
+function wsSend(obj){
+  if(S.ws && S.ws.readyState===1){
+    S.ws.send(JSON.stringify(obj));
+  } else {
+    toast('Sin conexión WebSocket','err');
+  }
+}
+
 function wsOnMessage(e){
   try{
     var d = JSON.parse(e.data);
@@ -852,9 +861,8 @@ function updatePin(d){
 
 function setMode(pin, mode){
   if(!S.isAdmin){ toast('Solo admin puede cambiar modos','err'); return; }
-  apiPost('/api/pin/'+pin+'/mode', {mode:mode})
-    .then(function(d){ if(d.ok) toast('GPIO'+pin+' → '+mode,'ok') })
-    .catch(function(){ toast('Error al cambiar modo','err') });
+  wsSend({cmd:'mode', pin:pin, mode:mode});
+  toast('GPIO'+pin+' → '+mode,'ok');
 }
 
 function toggleOut(pin){
@@ -862,8 +870,7 @@ function toggleOut(pin){
   var p = S.pins.find(function(x){ return x.pin===pin });
   if(!p) return;
   var ns = p.value ? 0 : 1;
-  apiPost('/api/pin/'+pin+'/digital', {state:ns})
-    .catch(function(){ toast('Error','err') });
+  wsSend({cmd:'digital', pin:pin, state:ns});
 }
 
 function pwmInput(pin, val){
@@ -873,8 +880,7 @@ function pwmInput(pin, val){
 
 function setPWM(pin, val){
   if(!S.isAdmin){ toast('Solo admin','err'); return; }
-  apiPost('/api/pin/'+pin+'/pwm', {duty:parseInt(val)})
-    .catch(function(){ toast('Error PWM','err') });
+  wsSend({cmd:'pwm', pin:pin, duty:parseInt(val)});
 }
 
 function readDigital(pin){
@@ -891,7 +897,8 @@ function readADC(pin){
 
 function confirmAllOff(){
   if(!confirm('¿Apagar todos los outputs?')) return;
-  apiPost('/api/all/off',{}).then(function(){ toast('Todos apagados','ok') });
+  wsSend({cmd:'all_off'});
+  toast('Todos apagados','ok');
 }
 
 // ── SCHEDULER ─────────────────────────────────────────

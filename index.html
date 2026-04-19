@@ -629,18 +629,22 @@ function wsConnect(){
 function wsConnectLocal(){
   _wsMode = 'local';
   setConnStatus('connecting');
-  S.ws = new WebSocket(WS_LOCAL());
+  var sock = new WebSocket(WS_LOCAL());
+  S.ws = sock;
 
   // Timeout 3s — si no conecta, caer al relay
   _localTimer = setTimeout(function(){
-    if(S.ws && S.ws.readyState !== 1){
-      S.ws.close();
+    if(sock.readyState !== 1){
+      sock.onopen = sock.onclose = sock.onerror = null;
+      sock.close();
+      if(S.ws === sock) S.ws = null;
       _localFailed = true;
       wsConnectRelay();
     }
   }, 3000);
 
-  S.ws.onopen = function(){
+  sock.onopen = function(){
+    if(S.ws !== sock) return; // llegó tarde — ignorar
     clearTimeout(_localTimer);
     _localFailed = false;
     _wsMode = 'local';
@@ -648,14 +652,14 @@ function wsConnectLocal(){
     setConnStatus('local');
     wsOnReady();
   };
-  S.ws.onmessage = wsOnMessage;
-  S.ws.onerror   = function(){};
-  S.ws.onclose   = function(){
+  sock.onmessage = wsOnMessage;
+  sock.onerror   = function(){};
+  sock.onclose   = function(){
+    if(S.ws !== sock) return;
     clearTimeout(_localTimer);
     S.wsConnected = false;
     setConnStatus('off');
     clearInterval(S.pingInterval);
-    // Si estaba en local y se cayó, intentar relay
     if(_wsMode === 'local'){
       _localFailed = true;
       S.wsRetry = setTimeout(wsConnectRelay, 2000);
@@ -668,18 +672,20 @@ function wsConnectLocal(){
 function wsConnectRelay(){
   _wsMode = 'relay';
   setConnStatus('connecting');
-  S.ws = new WebSocket(RELAY.wsUrl());
+  var sock = new WebSocket(RELAY.wsUrl());
+  S.ws = sock;
 
-  S.ws.onopen = function(){
+  sock.onopen = function(){
+    if(S.ws !== sock) return;
     S.wsConnected = true;
     setConnStatus('relay');
     wsOnReady();
     toast('Conectado via Relay', 'ok');
   };
-  S.ws.onmessage = function(e){
+  sock.onmessage = function(e){
+    if(S.ws !== sock) return;
     try{
       var d = JSON.parse(e.data);
-      // El relay puede enviar status del device
       if(d.type==='status'){
         if(!d.online) toast('ESP32 offline en relay', 'err');
         return;
@@ -687,24 +693,26 @@ function wsConnectRelay(){
       wsOnMessage(e);
     }catch(ex){}
   };
-  S.ws.onerror = function(){};
-  S.ws.onclose = function(){
+  sock.onerror = function(){};
+  sock.onclose = function(){
+    if(S.ws !== sock) return;
     S.wsConnected = false;
     setConnStatus('off');
     clearInterval(S.pingInterval);
-    // Reintentar — primero local de nuevo por si volvió la WiFi
     _localFailed = false;
     S.wsRetry = setTimeout(wsConnect, 5000);
   };
 }
 
 function wsOnReady(){
+  if(!S.ws || S.ws.readyState !== 1) return;
   // Pedir estado inicial
   if(_wsMode === 'local'){
     S.ws.send(JSON.stringify({cmd:'GET_STATE'}));
   } else {
-    S.ws.send(JSON.stringify({cmd:'state'}));  // formato relay
+    S.ws.send(JSON.stringify({cmd:'state'}));
   }
+  clearInterval(S.pingInterval);
   S.pingInterval = setInterval(function(){
     if(S.ws && S.ws.readyState===1){
       S.ws.send(JSON.stringify({cmd:'PING'}));

@@ -507,7 +507,15 @@ var S = {
 };
 
 var BASE = () => 'http://' + S.ip + (S.port!=80?':'+S.port:'');
-var WS_URL = () => 'ws://' + S.ip + ':81';
+var WS_LOCAL = () => 'ws://' + S.ip + ':81';
+
+// ── Relay config ──────────────────────────────────────
+var RELAY = {
+  host:     'iit-relay-production.up.railway.app',
+  token:    'Serafin123',
+  deviceId: '307A7ED4DB1C',
+  wsUrl:    function(){ return 'wss://iit-relay-production.up.railway.app/ws?id=307A7ED4DB1C&role=client&token=Serafin123'; }
+};
 
 // ── Helpers ──────────────────────────────────────────
 function G(id){ return document.getElementById(id) }
@@ -603,23 +611,80 @@ var apiPut  = function(p,b){ return apiReq('PUT',p,b) };
 var apiDel  = function(p){ return apiReq('DELETE',p) };
 
 // ── WebSocket ─────────────────────────────────────────
+// ── Conexión dual: local → relay ─────────────────────
+var _wsMode = 'local';   // 'local' | 'relay'
+var _localFailed = false;
+var _localTimer = null;
+
 function wsConnect(){
   if(S.ws && (S.ws.readyState===0||S.ws.readyState===1)) return;
-  S.ws = new WebSocket(WS_URL());
+  // Si ya falló local antes, ir directo al relay
+  if(_localFailed){
+    wsConnectRelay();
+  } else {
+    wsConnectLocal();
+  }
+}
+
+function wsConnectLocal(){
+  _wsMode = 'local';
+  setConnStatus('connecting');
+  S.ws = new WebSocket(WS_LOCAL());
+
+  // Timeout 3s — si no conecta, caer al relay
+  _localTimer = setTimeout(function(){
+    if(S.ws && S.ws.readyState !== 1){
+      S.ws.close();
+      _localFailed = true;
+      wsConnectRelay();
+    }
+  }, 3000);
+
   S.ws.onopen = function(){
+    clearTimeout(_localTimer);
+    _localFailed = false;
+    _wsMode = 'local';
     S.wsConnected = true;
     setConnStatus('local');
-    S.ws.send(JSON.stringify({cmd:'GET_STATE'}));
-    S.pingInterval = setInterval(function(){
-      if(S.ws && S.ws.readyState===1) S.ws.send(JSON.stringify({cmd:'PING'}));
-    }, 20000);
+    wsOnReady();
+  };
+  S.ws.onmessage = wsOnMessage;
+  S.ws.onerror   = function(){};
+  S.ws.onclose   = function(){
+    clearTimeout(_localTimer);
+    S.wsConnected = false;
+    setConnStatus('off');
+    clearInterval(S.pingInterval);
+    // Si estaba en local y se cayó, intentar relay
+    if(_wsMode === 'local'){
+      _localFailed = true;
+      S.wsRetry = setTimeout(wsConnectRelay, 2000);
+    } else {
+      S.wsRetry = setTimeout(wsConnect, 5000);
+    }
+  };
+}
+
+function wsConnectRelay(){
+  _wsMode = 'relay';
+  setConnStatus('connecting');
+  S.ws = new WebSocket(RELAY.wsUrl());
+
+  S.ws.onopen = function(){
+    S.wsConnected = true;
+    setConnStatus('relay');
+    wsOnReady();
+    toast('Conectado via Relay', 'ok');
   };
   S.ws.onmessage = function(e){
     try{
       var d = JSON.parse(e.data);
-      if(d.type==='STATE' && d.pins){ S.pins=d.pins; renderPins(); }
-      else if(d.type==='PIN_CHANGE'){ updatePin(d); }
-      else if(d.type==='SCHED_FIRED'){ toast('Scheduler: GPIO'+d.pin+' → '+d.action,'ok'); }
+      // El relay puede enviar status del device
+      if(d.type==='status'){
+        if(!d.online) toast('ESP32 offline en relay', 'err');
+        return;
+      }
+      wsOnMessage(e);
     }catch(ex){}
   };
   S.ws.onerror = function(){};
@@ -627,16 +692,45 @@ function wsConnect(){
     S.wsConnected = false;
     setConnStatus('off');
     clearInterval(S.pingInterval);
-    S.wsRetry = setTimeout(wsConnect, 4000);
+    // Reintentar — primero local de nuevo por si volvió la WiFi
+    _localFailed = false;
+    S.wsRetry = setTimeout(wsConnect, 5000);
   };
+}
+
+function wsOnReady(){
+  // Pedir estado inicial
+  if(_wsMode === 'local'){
+    S.ws.send(JSON.stringify({cmd:'GET_STATE'}));
+  } else {
+    S.ws.send(JSON.stringify({cmd:'state'}));  // formato relay
+  }
+  S.pingInterval = setInterval(function(){
+    if(S.ws && S.ws.readyState===1){
+      S.ws.send(JSON.stringify({cmd:'PING'}));
+    }
+  }, 20000);
+}
+
+function wsOnMessage(e){
+  try{
+    var d = JSON.parse(e.data);
+    if((d.type==='STATE'||d.pins) && d.pins){ S.pins=d.pins; renderPins(); }
+    else if(d.type==='PIN_CHANGE'){ updatePin(d); }
+    else if(d.type==='SCHED_FIRED'){ toast('Scheduler: GPIO'+d.pin+' → '+d.action,'ok'); }
+  }catch(ex){}
 }
 
 function setConnStatus(state){
   var dot   = G('connDot');
   var label = G('connLabel');
-  dot.className = 'conn-dot ' + state;
-  label.textContent = state==='local'?'LOCAL':state==='relay'?'RELAY':'OFFLINE';
-  G('infoWS').textContent = (S.ws ? S.ws.readyState===1?'Conectado':'Cerrado' : '---');
+  dot.className = 'conn-dot ' + (state==='connecting'?'off':state);
+  if(state==='local')       label.textContent='LOCAL';
+  else if(state==='relay')  label.textContent='RELAY';
+  else if(state==='connecting') label.textContent='...';
+  else                      label.textContent='OFFLINE';
+  G('infoWS').textContent = (S.ws ? S.ws.readyState===1?
+    (_wsMode==='relay'?'Relay':'Local'):'Conectando...' : '---');
 }
 
 // ── Launch App ────────────────────────────────────────

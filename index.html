@@ -551,13 +551,36 @@ function closeModal(id){ G(id).classList.remove('open') }
 
 // ── Auth ─────────────────────────────────────────────
 function doLogin(){
-  S.ip   = G('deviceIP').value.trim();
+  S.ip   = G('deviceIP').value.trim() || '192.168.1.100';
   S.port = parseInt(G('devicePort').value)||80;
   var user = G('loginUser').value.trim();
   var pass = G('loginPass').value;
-  if(!S.ip){ showLoginMsg('Ingresa la IP del dispositivo','err'); return; }
   if(!user || !pass){ showLoginMsg('Ingresa usuario y contraseña','err'); return; }
+
   showLoginMsg('Conectando...','');
+
+  // En HTTPS usar proxy del relay
+  var loginUrl, loginOpts;
+  if(location.protocol === 'https:'){
+    loginUrl  = RELAY_PROXY + '?id=' + RELAY.deviceId + '&path=/api/login&token=';
+    loginOpts = { method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({user:user,pass:pass}) };
+    fetch(loginUrl, loginOpts)
+    .then(function(r){ return r.json() })
+    .then(function(d){
+      if(!d.token){ showLoginMsg(d.error||'Credenciales incorrectas','err'); return; }
+      S.token=d.token; S.role=d.role||'viewer'; S.isAdmin=(S.role==='admin');
+      localStorage.setItem('iit_ip',   S.ip);
+      localStorage.setItem('iit_port', S.port);
+      localStorage.setItem('iit_token',S.token);
+      localStorage.setItem('iit_role', S.role);
+      launchApp();
+    })
+    .catch(function(){ showLoginMsg('No se pudo conectar al relay','err') });
+    return;
+  }
+
   fetch(BASE()+'/api/login', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -597,7 +620,21 @@ function doLogout(){
 }
 
 // ── API helpers ───────────────────────────────────────
+var RELAY_PROXY = 'https://iit-relay-production.up.railway.app/proxy';
+
 function apiReq(method, path, body){
+  // En HTTPS usar proxy del relay para evitar Mixed Content
+  if(location.protocol === 'https:'){
+    var proxyUrl = RELAY_PROXY
+      + '?id=' + RELAY.deviceId
+      + '&path=' + encodeURIComponent(path)
+      + '&token=' + encodeURIComponent(S.token);
+    var opts = { method: method,
+      headers: { 'Content-Type': 'application/json' } };
+    if(body !== undefined) opts.body = JSON.stringify(body);
+    return fetch(proxyUrl, opts).then(function(r){ return r.json() });
+  }
+  // En HTTP directo al ESP32
   var opts = { method:method, headers:{'X-Token':S.token} };
   if(body !== undefined){
     opts.headers['Content-Type'] = 'application/json';
@@ -618,12 +655,8 @@ var _localTimer = null;
 
 function wsConnect(){
   if(S.ws && (S.ws.readyState===0||S.ws.readyState===1)) return;
-  // Si ya falló local antes, ir directo al relay
-  if(_localFailed){
-    wsConnectRelay();
-  } else {
-    wsConnectLocal();
-  }
+  // Siempre relay desde GitHub Pages (HTTPS no permite ws:// local)
+  wsConnectRelay();
 }
 
 function wsConnectLocal(){
@@ -751,6 +784,7 @@ function launchApp(){
     G('otaCard').style.display='block';
   }
   wsConnect();
+  // REST via proxy funciona tanto en HTTP como HTTPS
   loadInfo();
   loadUsers();
 }

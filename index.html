@@ -784,9 +784,33 @@ function launchApp(){
     G('otaCard').style.display='block';
   }
   wsConnect();
-  // REST via proxy funciona tanto en HTTP como HTTPS
-  loadInfo();
-  loadUsers();
+  // En HTTPS esperar que el relay conecte antes de llamadas REST
+  if(location.protocol === 'https:'){
+    waitForRelayAndLoad();
+  } else {
+    loadInfo();
+    loadUsers();
+  }
+}
+
+function waitForRelayAndLoad(){
+  var attempts = 0;
+  var maxAttempts = 20; // 10 segundos max
+  var check = setInterval(function(){
+    attempts++;
+    if(S.wsConnected){
+      clearInterval(check);
+      setTimeout(function(){
+        loadInfo();
+        loadUsers();
+      }, 500); // pequeño delay extra para que ESP32 procese
+    } else if(attempts >= maxAttempts){
+      clearInterval(check);
+      // Intentar igual — puede que el proxy no necesite WS activo
+      loadInfo();
+      loadUsers();
+    }
+  }, 500);
 }
 
 // ── PINS ─────────────────────────────────────────────

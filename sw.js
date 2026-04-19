@@ -1,4 +1,4 @@
-var CACHE = 'iit-gpio-pro-v1';
+var CACHE = 'iit-gpio-pro-v3';
 var ASSETS = ['./index.html', './manifest.json'];
 
 self.addEventListener('install', function(e){

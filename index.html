@@ -1123,7 +1123,16 @@ document.querySelectorAll('.modal-overlay').forEach(function(el){
 
 // Service Worker
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js').catch(function(){});
+  // Limpiar caches viejos al registrar
+  navigator.serviceWorker.register('sw.js').then(function(reg){
+    reg.update();
+  }).catch(function(){});
+  // Limpiar caches obsoletos
+  if(window.caches){
+    caches.keys().then(function(keys){
+      keys.forEach(function(k){ if(k!=='iit-gpio-pro-v3') caches.delete(k); });
+    });
+  }
 }
 </script>
 </body>
